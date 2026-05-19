@@ -1,0 +1,943 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no, viewport-fit=cover">
+    <title>麻雀避雨大冒險 - 活潑可愛版</title>
+    <style>
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+            user-select: none;
+            -webkit-user-select: none;
+        }
+        body, html {
+            width: 100%;
+            height: 100%;
+            overflow: hidden;
+            background: #1e293b; 
+            font-family: "Comic Sans MS", "Chalkboard SE", "Balsamiq Sans", "Microsoft JhengHei", sans-serif;
+            touch-action: none;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+        }
+
+        /* 核心：外層安全容器 */
+        #orientation-wrapper {
+            width: 100vw;
+            height: 100vh;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            position: relative;
+        }
+
+        /* 遊戲主視窗 - 修正手機橫式長度與 100% 滿版橫向體驗 */
+        #game-container {
+            position: relative;
+            width: 100vw;
+            height: 56.25vw; /* 保持 16:9 比例 */
+            max-width: 100%;
+            max-height: 100%;
+            background-image: url('game_bg.jpg'); 
+            background-size: cover;
+            background-position: center;
+            overflow: hidden;
+            background-color: #bae6fd; 
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.5);
+            border-radius: 12px;
+            container-type: size; /* 啟用容器查詢 */
+        }
+
+        /* 當手機直立時，翻轉 90 度並使其適應 16:9 */
+        @media screen and (orientation: portrait) {
+            #game-container {
+                width: 100vh;
+                height: 56.25vh;
+                max-width: 100vh;
+                max-height: 100vw;
+                transform: rotate(90deg);
+                transform-origin: center center;
+            }
+        }
+
+        /* 橫式螢幕比例比 16:9 還寬時的處理 */
+        @media screen and (min-aspect-ratio: 16/9) {
+            #game-container {
+                width: calc(100vh * 16 / 9);
+                height: 100vh;
+            }
+        }
+
+        /* 雨絲背景 */
+        .rain-bg {
+            position: absolute;
+            width: 3px; 
+            height: 40px;
+            background: rgba(255, 255, 255, 0.6); 
+            border-radius: 2px;
+            opacity: 0.5;
+        }
+        
+        /* 麻雀元件 */
+        #sparrow {
+            position: absolute;
+            width: 28cqh;
+            height: 28cqh;
+            min-width: 65px;
+            min-height: 65px;
+            background-image: url('flying_sparrow.png');
+            background-size: contain; 
+            background-repeat: no-repeat;
+            background-position: center;
+            background-color: transparent;
+            left: 10%;
+            top: 55%;
+            transition: top 0.2s cubic-bezier(0.25, 1, 0.5, 1), left 0.5s ease-out;
+            z-index: 10;
+            transform: translateY(-50%);
+        }
+        
+        /* 雨滴 */
+        .raindrop {
+            position: absolute;
+            width: 7cqh;       
+            height: 12cqh;      
+            min-width: 16px;
+            min-height: 28px;
+            background-image: url('raindrop.png'); 
+            background-size: contain;
+            background-repeat: no-repeat;
+            background-position: center;
+            z-index: 15;
+            filter: drop-shadow(0px 4px 6px rgba(14, 165, 233, 0.3));
+            transform: translateY(-50%);
+        }
+        
+        /* 窗台休息區 */
+        #window-frame {
+            position: absolute;
+            right: -40%;
+            top: 0; 
+            width: 35%; 
+            height: 100%; 
+            background: #7dd3fc; 
+            border-left: 12px solid #38bdf8;
+            transition: right 1s ease-out;
+            z-index: 8;
+            overflow: hidden; 
+            box-shadow: -5px 0 25px rgba(14, 165, 233, 0.3);
+        }
+        #window-content {
+            width: 100%;
+            height: 100%;
+            background-image: url('window_birds.png');
+            background-size: cover; 
+            background-position: center;
+        }
+        
+        /* UI 資訊欄 */
+        #ui-panel {
+            position: absolute;
+            top: 4cqh;
+            left: 3cqw;
+            display: flex;
+            flex-wrap: wrap;
+            gap: 1cqw;
+            z-index: 20;
+            max-width: 70%;
+        }
+        .ui-badge {
+            background: rgba(255, 255, 255, 0.95);
+            color: #0369a1;
+            padding: 0.8cqh 2cqw;
+            border-radius: 20px;
+            font-size: 2.8cqh; 
+            font-weight: 900;
+            border: 0.4cqh solid #38bdf8;
+            box-shadow: 0 0.5cqh 0px #bae6fd;
+            text-shadow: 1px 1px 0px white;
+            white-space: nowrap;
+        }
+
+        /* 漢堡選單按鈕 */
+        #hamburger-btn {
+            position: absolute;
+            top: 4cqh;
+            right: 3cqw;
+            width: 7cqh;
+            height: 7cqh;
+            background: #38bdf8;
+            border: 0.4cqh solid white;
+            border-radius: 20%;
+            cursor: pointer;
+            z-index: 150;
+            display: flex;
+            flex-direction: column;
+            justify-content: space-around;
+            padding: 1.2cqh;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+        }
+        #hamburger-btn span {
+            display: block;
+            width: 100%;
+            height: 0.5cqh;
+            background: white;
+            border-radius: 2px;
+            transition: 0.3s;
+        }
+        #hamburger-btn.open span:nth-child(1) { transform: rotate(45deg) translate(0.8cqh, 0.8cqh); }
+        #hamburger-btn.open span:nth-child(2) { opacity: 0; }
+        #hamburger-btn.open span:nth-child(3) { transform: rotate(-45deg) translate(0.8cqh, -0.8cqh); }
+
+        /* 右側選單面版 */
+        #menu-panel {
+            position: absolute;
+            top: 0;
+            right: -40cqw;
+            width: 40cqw;
+            height: 100%;
+            background: rgba(224, 242, 254, 0.98);
+            border-left: 0.8cqw solid #7dd3fc;
+            box-shadow: -5px 0 20px rgba(0,0,0,0.2);
+            z-index: 140;
+            transition: right 0.3s ease;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            padding-top: 12cqh;
+            color: #0369a1;
+        }
+        #menu-panel.open { right: 0; }
+        #menu-panel h2 {
+            font-size: 4.5cqh;
+            color: #0284c7;
+            margin-bottom: 4cqh;
+        }
+        .menu-item {
+            width: 80%;
+            margin-bottom: 3cqh;
+            text-align: center;
+        }
+        .menu-item label {
+            display: block;
+            margin-bottom: 1cqh;
+            font-size: 3cqh;
+            font-weight: bold;
+        }
+
+        /* 滿版獨立封面遮罩 */
+        #msg-overlay {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background-image: url('image_646c76.png'); 
+            background-size: cover;
+            background-position: center;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            color: white;
+            z-index: 100;
+            padding: 3cqh;
+        }
+
+        #msg-overlay.game-over-style {
+            background-image: none !important;
+            background: rgba(15, 23, 42, 0.85);
+        }
+
+        .cover-card {
+            background: rgba(255, 255, 255, 0.95); 
+            border: 0.5cqh solid #7dd3fc;
+            border-radius: 20px;
+            padding: 3cqh 4cqw;
+            max-width: 85%; 
+            width: 90%;
+            text-align: center;
+            box-shadow: 0 12px 24px rgba(0, 0, 0, 0.3);
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 2cqh;
+        }
+
+        .cover-card.game-over-style {
+            background: none !important;
+            border: none !important;
+            box-shadow: none !important;
+        }
+
+        .cover-illustration {
+            width: 25cqh;
+            height: 18cqh;
+            background-image: url('flying_sparrow.png'); 
+            background-size: contain;
+            background-repeat: no-repeat;
+            background-position: center;
+        }
+        #msg-overlay h1 {
+            font-size: 4.5cqh; 
+            color: #0284c7; 
+            text-shadow: 2px 2px 0px #bae6fd;
+            font-weight: 900;
+        }
+
+        #msg-overlay h1.game-over-text {
+            color: #ef4444 !important;
+            text-shadow: 2px 2px 0px #000;
+            font-size: 6.5cqh;
+        }
+
+        #msg-overlay p {
+            font-size: 2.6cqh;
+            color: #0369a1;
+            text-align: left;
+            line-height: 1.5;
+            background: rgba(240, 249, 255, 0.95); 
+            padding: 2cqh 3cqw;
+            border-radius: 14px;
+            width: 100%;
+            border: 0.3cqh dashed #7dd3fc;
+        }
+
+        #msg-overlay p.game-over-text {
+            background: none !important;
+            border: none !important;
+            color: #ffffff !important;
+            font-size: 3.8cqh;
+            text-align: center;
+            text-shadow: 1px 1px 4px rgba(0,0,0,0.8);
+        }
+
+        .instruction-tag {
+            display: inline-block;
+            background: #38bdf8;
+            color: white;
+            padding: 0.2cqh 1cqw;
+            border-radius: 6px;
+            font-weight: bold;
+            font-size: 2.2cqh;
+        }
+
+        /* 知識問答彈出視窗 */
+        #quiz-overlay {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0,0,0,0.5);
+            display: none;
+            justify-content: center;
+            align-items: center;
+            z-index: 120;
+            padding: 2cqh;
+        }
+        #quiz-container {
+            background: #f0f9ff;
+            border: 0.6cqh solid #fef08a;
+            border-radius: 20px;
+            width: 90%;
+            max-width: 75%;
+            padding: 3cqh;
+            box-shadow: 0 10px 24px rgba(0,0,0,0.3);
+            text-align: center;
+            color: #0369a1;
+        }
+        #quiz-question {
+            font-size: 3.2cqh;
+            font-weight: bold;
+            margin-bottom: 2cqh;
+            color: #0284c7;
+            line-height: 1.4;
+        }
+        .quiz-options-grid {
+            display: flex;
+            flex-direction: column;
+            gap: 1.5cqh;
+            margin-bottom: 2cqh;
+        }
+        .quiz-opt-btn {
+            background: white;
+            color: #0c4a6e;
+            border: 0.4cqh solid #bae6fd;
+            padding: 1.5cqh;
+            font-size: 2.8cqh;
+            font-weight: bold;
+            border-radius: 12px;
+            cursor: pointer;
+            box-shadow: 0 0.4cqh 0px #bae6fd;
+        }
+        
+        #quiz-result {
+            font-size: 2.8cqh;
+            font-weight: bold;
+            margin: 1cqh 0;
+            min-height: 4cqh;
+        }
+
+        /* 按鈕樣式 */
+        .btn-group { display: flex; gap: 2cqw; width: 100%; justify-content: center; }
+        .game-btn {
+            padding: 1cqh 3cqw;
+            font-size: 3cqh;
+            font-weight: 900;
+            color: white;
+            border: none;
+            border-radius: 50px;
+            cursor: pointer;
+            box-shadow: 0 0.5cqh 0px rgba(0,0,0,0.15);
+        }
+        .game-btn:active { transform: translateY(2px); }
+        #start-btn { background: #4ade80; box-shadow: 0 0.5cqh 0px #22c55e; }
+        #exit-btn { background: #f87171; box-shadow: 0 0.5cqh 0px #ef4444; display: none; }
+        
+        #quiz-confirm-btn {
+            background: #38bdf8;
+            box-shadow: 0 0.5cqh 0px #0284c7;
+            width: 100%;
+            border-radius: 12px;
+        }
+        .menu-btn {
+            width: 80%;
+            padding: 1.5cqh 0;
+            margin-top: 2cqh;
+            border-radius: 50px;
+        }
+        .btn-restart { background: #38bdf8; box-shadow: 0 0.5cqh 0px #0284c7; }
+    </style>
+</head>
+<body>
+
+    <audio id="bgm" src="bgm.mp3" loop></audio>
+
+    <div id="orientation-wrapper">
+        <div id="game-container">
+            <div id="rain-bg-container"></div>
+             
+            <div id="sparrow"></div>
+            <div id="window-frame">
+                <div id="window-content"></div>
+            </div>
+             
+            <div id="ui-panel">
+                <div id="level-display" class="ui-badge">關卡: 1 / 10</div>
+                <div id="progress-display" class="ui-badge">躲避進度: 0 / 20</div>
+                <div id="score-display" class="ui-badge">分數: 0</div>
+            </div>
+
+            <div id="hamburger-btn" onclick="toggleMenu()">
+                <span></span>
+                <span></span>
+                <span></span>
+            </div>
+
+            <div id="menu-panel">
+                <h2>遊戲選單</h2>
+                <div class="menu-item">
+                    <label for="volume-slider">音樂音量</label>
+                    <input type="range" id="volume-slider" min="0" max="1" step="0.1" value="0.5" oninput="adjustVolume(this.value)">
+                </div>
+                <button class="game-btn menu-btn btn-restart" onclick="menuRestart()">重新開始</button>
+                <button class="game-btn menu-btn id-exit" style="background:#f87171;" onclick="exitGame()">退出遊戲</button>
+            </div>
+
+            <div id="quiz-overlay">
+                <div id="quiz-container">
+                    <div id="quiz-question">這裡會顯示雨天的小問題？</div>
+                    <div class="quiz-options-grid" id="quiz-options"></div>
+                    <div id="quiz-result"></div>
+                    <button id="quiz-confirm-btn" class="game-btn" style="display: none;" onclick="closeQuizAndNext()">確定</button>
+                </div>
+            </div>
+
+            <div id="msg-overlay">
+                <div class="cover-card" id="cover-card">
+                    <div class="cover-illustration" id="cover-illustration"></div>
+                    <h1 id="msg-title">麻雀避雨大冒險</h1>
+                    <p id="msg-desc">
+                        小麻雀肚子餓了又怕淋濕！快來幫忙躲過重重雨滴，順利抵達溫暖的窗台吧！挑戰 10 道氣象隨機考驗關卡，讓分數大幅翻倍喔！<br><br>
+                        <span class="instruction-tag">電腦操作</span> 方向鍵 <b>↑↓</b> 變更高度，長按 <b>→</b> 鍵加速前進。<br>
+                        <span class="instruction-tag">手機操作</span> 點擊畫面 <b>上半部/下半部</b> 切換高度，<b>長按畫面右側</b> 加速前進。
+                    </p>
+                    <div class="btn-group">
+                        <button id="start-btn" class="game-btn" onclick="startGame()">開始遊戲</button>
+                        <button id="exit-btn" class="game-btn" onclick="exitGame()">結束遊戲</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+<script>
+    const container = document.getElementById('game-container');
+    const sparrow = document.getElementById('sparrow');
+    const windowFrame = document.getElementById('window-frame');
+    const scoreDisplay = document.getElementById('score-display');
+    const levelDisplay = document.getElementById('level-display');
+    const progressDisplay = document.getElementById('progress-display');
+    const msgOverlay = document.getElementById('msg-overlay');
+    const coverCard = document.getElementById('cover-card');
+    const coverIllustration = document.getElementById('cover-illustration');
+    const msgTitle = document.getElementById('msg-title');
+    const msgDesc = document.getElementById('msg-desc');
+    const startBtn = document.getElementById('start-btn');
+    const exitBtn = document.getElementById('exit-btn');
+    const rainBgContainer = document.getElementById('rain-bg-container');
+    const bgm = document.getElementById('bgm'); 
+    const hamburgerBtn = document.getElementById('hamburger-btn');
+    const menuPanel = document.getElementById('menu-panel');
+    const volumeSlider = document.getElementById('volume-slider');
+     
+    const quizOverlay = document.getElementById('quiz-overlay');
+    const quizQuestion = document.getElementById('quiz-question');
+    const quizOptions = document.getElementById('quiz-options');
+    const quizResult = document.getElementById('quiz-result');
+    const quizConfirmBtn = document.getElementById('quiz-confirm-btn');
+
+    const quizBank = [
+        { q: "下雨天出門時，應該帶哪一種工具出門呢？", o: ["阿公的拐杖", "雨傘或雨衣", "漂亮的扇子"], a: 1 },
+        { q: "看到天空亮亮的閃電，接著可能會聽到什麼聲音？", o: ["大聲的小狗叫", "轟隆隆的打雷聲", "小鳥在唱歌"], a: 1 },
+        { q: "下雨過後，太陽公公出來了，天空可能會出現什麼？", o: ["美麗的彩虹", "亮晶晶的星星", "黑黑的烏雲"], a: 0 },
+        { q: "下雨天走在路上，看到地上的小水坑應該怎麼辦？", o: ["用力踩下去玩水", "繞過去小心走過", "躺在水坑裡睡覺"], a: 1 },
+        { q: "為什麼下雨天走路要慢慢走，不能用跑的？", o: ["開車會肚子痛", "因為地板濕濕的很容易滑倒", "因為雨水會生氣"], a: 1 },
+        { q: "天氣預報說今天降雨機率是 90%，代表今天會怎麼樣？", o: ["超級有可能會下雨", "絕對是超級大晴天", "會刮大風但不下雨"], a: 0 },
+        { q: "雨水是從天空中的什麼地方掉下來的？", o: ["太陽公公家", "白白的飛機", "黑黑的烏雲"], a: 2 },
+        { q: "打雷的時候，如果我們在戶外，應該躲在哪裡比較安全？", o: ["大樹下面", "安全的建築物裡面", "高高的山頂上"], a: 1 },
+        { q: "小青蛙最喜歡在什麼樣的天氣出來唱歌？", o: ["太陽很大的大熱天", "下雨過後濕濕的天氣", "風很大的下雪天"], a: 1 },
+        { q: "下雨天坐公車或開車，車窗常常會霧霧的，那是因為什麼？", o: ["車窗髒掉了", "車子裡外有溫差產生水氣", "外面有人在吹氣"], a: 1 },
+        { q: "大雨過後，空氣常常會變得很怎麼樣？", o: ["很清新乾淨", "臭氣沖天", "充滿黑色的煙霧"], a: 0 },
+        { q: "下列哪一種動物在快要下雨前，會成群低空飛行的找食物？", o: ["蝴蝶", "燕子", "大水牛"], a: 1 },
+        { q: "如果連續好幾個月都不下雨，會發生什麼事情？", o: ["水庫沒水，大家會缺水", "河水會變多", "植物會長得更茂盛"], a: 0 },
+        { q: "穿雨衣騎腳踏車為什麼很危險？", o: ["開車視線太美", "因為會視線不清且容易捲入車輪", "因為會飛起來"], a: 1 },
+        { q: "下大雨的時候，我們不應該去哪裡玩，才不會發生危險？", o: ["家裡的客廳", "學校的圖書館", "山區或河邊"], a: 2 },
+        { q: "天空中的雲朵，是由什麼小東西聚集在一起變成的？", o: ["棉花糖", "小水滴和小冰晶", "白色的羽毛"], a: 1 },
+        { q: "梅雨季節常常連續下很多天的雨，通常是在哪兩個月份呢？", o: ["一月到二月", "五月到六月", "九月到十月"], a: 1 },
+        { q: "除了一般的下雨，如果空中的小水滴凍結成冰塊掉下來，那叫做什麼？", o: ["冰雹", "飄雪", "流星雨"], a: 0 },
+        { q: "下雨天時，麻雀等小鳥通常會躲在哪裡避雨？", o: ["騎樓或屋簷下", "水池的底部", "飛到雲朵上面"], a: 0 },
+        { q: "雨傘的表面通常會塗上一層什麼，才能幫我們擋住雨水？", o: ["防水的材質", "好吃的草莓醬", "厚厚的膠水"], a: 0 }
+    ];
+
+    let shuffledQuizIndices = [];
+    let currentQuizPointer = 0;
+    const maxGameLevels = 10; // 固定遊戲總共 10 關
+
+    // 隨機抽取 10 題不重複題目的洗牌演算法
+    function shuffleQuizzes() {
+        shuffledQuizIndices = Array.from({length: quizBank.length}, (_, i) => i);
+        for (let i = shuffledQuizIndices.length - 1; i > 0; i--) {
+            const j = Math.floor(Math.random() * (i + 1));
+            [shuffledQuizIndices[i], shuffledQuizIndices[j]] = [shuffledQuizIndices[j], shuffledQuizIndices[i]];
+        }
+        currentQuizPointer = 0;
+    }
+
+    const LANE_PCT_Y = [28, 55, 82]; 
+
+    function renderSparrowPosition() {
+        sparrow.style.top = LANE_PCT_Y[currentLane] + '%';
+    }
+
+    let currentLane = 1; 
+    let gameState = 'INIT'; 
+    let score = 0;
+    let currentLevel = 1;
+    let avoidedCount = 0; 
+    let targetCount = 20; 
+     
+    let baseSpeed = 0.6; 
+    let speedMultiplier = 1; 
+    let spawnInterval = 850; 
+    let lastSpawnWasDouble = false; // 新增：防連續雙雨滴機制的冷卻旗標
+     
+    let raindrops = [];
+    let gameLoopId, spawnLoopId;
+    let isMenuOpen = false;
+
+    bgm.volume = parseFloat(volumeSlider.value);
+
+    function forceUnlockAudio() {
+        if (bgm.paused && (gameState === 'PLAYING' || gameState === 'RESTING')) {
+            bgm.play().catch(e => {});
+        }
+    }
+    document.body.addEventListener('click', forceUnlockAudio);
+    document.body.addEventListener('touchstart', forceUnlockAudio);
+
+    for(let i=0; i<30; i++) { createBgRain(); }
+    function createBgRain() {
+        const div = document.createElement('div');
+        div.className = 'rain-bg';
+        div.style.left = Math.random() * 100 + '%';
+        div.style.top = Math.random() * 100 + '%';
+        rainBgContainer.appendChild(div);
+    }
+
+    function initGame() {
+        score = 0;
+        currentLevel = 1;
+        targetCount = 20; 
+        avoidedCount = 0;
+        currentLane = 1;
+        lastSpawnWasDouble = false;
+         
+        shuffleQuizzes(); 
+        renderSparrowPosition();
+         
+        sparrow.style.left = '10%';
+        windowFrame.style.right = '-40%';
+         
+        raindrops.forEach(drop => drop.element.remove());
+        raindrops = [];
+        quizOverlay.style.display = 'none';
+        quizConfirmBtn.style.display = 'none';
+         
+        msgOverlay.style.display = 'flex';
+        msgOverlay.classList.remove('game-over-style');
+        coverCard.classList.remove('game-over-style');
+        msgTitle.classList.remove('game-over-text');
+        msgDesc.classList.remove('game-over-text');
+        coverIllustration.style.display = 'block';
+         
+        msgTitle.innerText = "麻雀避雨大冒險";
+        msgDesc.innerHTML = `小麻雀肚子餓了又怕淋濕！快來幫忙躲過重重雨滴，順利抵達溫暖的窗台吧！挑戰 10 道氣象隨機考驗關卡，讓分數大幅翻倍喔！<br><br>
+                        <span class="instruction-tag">電腦操作</span> 方向鍵 <b>↑↓</b> 變更高度，長按 <b>→</b> 鍵加速前進。<br>
+                        <span class="instruction-tag">手機操作</span> 點擊畫面 <b>上半部/下半部</b> 切換高度，<b>長按畫面右側</b> 加速前進。`;
+        startBtn.innerText = "開始遊戲";
+        updateUI();
+    }
+
+    function startGame() {
+        if(gameState === 'INIT' || gameState === 'GAMEOVER' || gameState === 'WIN') { initGame(); }
+        msgOverlay.style.display = 'none';
+        gameState = 'PLAYING';
+         
+        bgm.currentTime = 0;
+        bgm.play().catch(e => {});
+         
+        if(gameLoopId) cancelAnimationFrame(gameLoopId);
+        gameLoopId = requestAnimationFrame(updateGame);
+        startSpawnLoops();
+    }
+
+    function startSpawnLoops() {
+        clearInterval(spawnLoopId);
+        // 優化點 1：提高生成間隔的下限值（由 380 放寬到 460），防止手機版雨滴在密集時完全無縫隙
+        let interval = Math.max(460, spawnInterval - (currentLevel - 1) * 55);
+        spawnLoopId = setInterval(spawnRaindrop, interval);
+    }
+
+    function updateUI() {
+        levelDisplay.innerText = `關卡: ${currentLevel} / ${maxGameLevels}`;
+        progressDisplay.innerText = `躲避進度: ${avoidedCount} / ${targetCount}`;
+        scoreDisplay.innerText = `分數: ${score}`;
+    }
+
+    function spawnRaindrop() {
+        if(gameState !== 'PLAYING') return;
+        
+        let count = 1;
+        // 優化點 2：實施防連續雙波降雨機制 (如果前一波已經出了兩顆，這一波強迫改為單顆)
+        if (currentLevel >= 3 && !lastSpawnWasDouble && Math.random() < 0.35) {
+            count = 2;
+            lastSpawnWasDouble = true;
+        } else {
+            count = 1;
+            lastSpawnWasDouble = false;
+        }
+
+        let allLanes = [0, 1, 2];
+        let lanesToSpawn = [];
+         
+        for (let i = 0; i < count; i++) {
+            const randomIndex = Math.floor(Math.random() * allLanes.length);
+            lanesToSpawn.push(allLanes.splice(randomIndex, 1)[0]);
+        }
+
+        lanesToSpawn.forEach(lane => {
+            const element = document.createElement('div');
+            element.className = 'raindrop';
+            element.style.left = '105%';
+            element.style.top = LANE_PCT_Y[lane] + '%';
+            container.appendChild(element);
+             
+            raindrops.push({
+                element: element,
+                pctX: 105,
+                lane: lane,
+                scored: false
+            });
+        });
+    }
+
+    function updateGame() {
+        if (gameState === 'GAMEOVER' || gameState === 'WIN') return;
+
+        if (!isMenuOpen && gameState !== 'QUIZ_TIME') {
+            const bgRains = document.querySelectorAll('.rain-bg');
+            bgRains.forEach(bg => {
+                let top = parseFloat(bg.style.top) + (0.5 * speedMultiplier);
+                let left = parseFloat(bg.style.left) - (0.1 * speedMultiplier);
+                if(top > 100) { top = -5; left = Math.random() * 100; }
+                bg.style.top = top + '%';
+                bg.style.left = left + '%';
+            });
+        }
+
+        if (gameState === 'PLAYING' && !isMenuOpen) {
+            let currentSpeed = (baseSpeed + (currentLevel - 1) * 0.1) * speedMultiplier;
+
+            for (let i = raindrops.length - 1; i >= 0; i--) {
+                let drop = raindrops[i];
+                drop.pctX -= currentSpeed;
+                drop.element.style.left = drop.pctX + '%';
+
+                // 優化點 3：針對小螢幕與旋轉模式縮小寬容度判定
+                // 將判定左邊緣原本的 9 調降為 11，右邊緣原本的 20 微調成 18.5。
+                // 這樣能有效防止麻雀在切換軌道時，明明視覺上稍微擦到邊卻被判定死亡的挫折感。
+                if (drop.lane === currentLane && drop.pctX > 11 && drop.pctX < 18.5) { 
+                    endGame();
+                    return;
+                }
+
+                if (!drop.scored && drop.pctX < 10) {
+                    drop.scored = true;
+                    avoidedCount++;
+                    score += 100;
+                    updateUI();
+
+                    if (avoidedCount >= targetCount && gameState === 'PLAYING') {
+                        triggerRestPhase();
+                    }
+                }
+
+                if (drop.pctX < -10) {
+                    drop.element.remove();
+                    raindrops.splice(i, 1);
+                }
+            }
+        } 
+        else if (gameState === 'RESTING' && !isMenuOpen) {
+            let windowRight = parseFloat(windowFrame.style.right);
+            if (windowRight < 0) {
+                windowRight += 1.5;
+                if(windowRight > 0) windowRight = 0;
+                windowFrame.style.right = windowRight + '%';
+            }
+            let sparrowLeftPx = parseFloat(sparrow.style.left);
+            if (sparrowLeftPx < 68) {
+                sparrowLeftPx += 0.8;
+                sparrow.style.left = sparrowLeftPx + '%';
+            } else {
+                gameState = 'QUIZ_TIME';
+                setTimeout(showQuiz, 300);
+            }
+        }
+
+        gameLoopId = requestAnimationFrame(updateGame);
+    }
+
+    function triggerRestPhase() {
+        gameState = 'RESTING'; 
+        clearInterval(spawnLoopId); 
+         
+        raindrops.forEach(drop => {
+            drop.element.style.transition = 'left 0.4s linear';
+            drop.element.style.left = '-15%';
+            setTimeout(() => drop.element.remove(), 400);
+        });
+        raindrops = [];
+        windowFrame.style.right = '0%';
+    }
+
+    function showQuiz() {
+        const activeIndex = shuffledQuizIndices[currentQuizPointer];
+        const randomQuiz = quizBank[activeIndex];
+         
+        quizQuestion.innerText = `【第 ${currentLevel} 關 - 雨天小知識】\n${randomQuiz.q}`;
+        quizResult.innerText = "";
+        quizResult.style.color = "#0369a1";
+        quizOptions.innerHTML = "";
+        quizConfirmBtn.style.display = 'none'; 
+
+        randomQuiz.o.forEach((optionText, index) => {
+            const btn = document.createElement('button');
+            btn.className = "quiz-opt-btn";
+            btn.innerText = optionText;
+            btn.onclick = () => checkQuizAnswer(index, randomQuiz.a, randomQuiz.o[randomQuiz.a]);
+            quizOptions.appendChild(btn);
+        });
+
+        quizOverlay.style.display = "flex";
+    }
+
+    function checkQuizAnswer(selectedIndex, correctIndex, correctAnswerText) {
+        const buttons = quizOptions.querySelectorAll('.quiz-opt-btn');
+        buttons.forEach(btn => { btn.disabled = true; });
+        
+        if (selectedIndex === correctIndex) {
+            quizResult.innerText = "🎉 答對了！太棒了！\n獲得額外加分獎勵！";
+            quizResult.style.color = "#22c55e";
+            score += 500;
+        } else {
+            quizResult.innerText = `❌ 答錯囉，沒關係！\n正確答案是：【${correctAnswerText}】`;
+            quizResult.style.color = "#ef4444";
+        }
+        updateUI();
+        quizConfirmBtn.style.display = 'block';
+    }
+
+    function closeQuizAndNext() {
+        quizOverlay.style.display = "none";
+        currentQuizPointer++; 
+        
+        if (currentLevel >= maxGameLevels) {
+            winGame();
+            return;
+        }
+
+        currentLevel++;
+        avoidedCount = 0;
+        targetCount = 20; 
+        gameState = 'PLAYING';
+        
+        sparrow.style.left = '10%';
+        windowFrame.style.right = '-40%';
+        renderSparrowPosition();
+        updateUI();
+        startSpawnLoops();
+    }
+
+    function winGame() {
+        gameState = 'WIN';
+        clearInterval(spawnLoopId);
+        bgm.pause();
+        
+        msgOverlay.style.display = 'flex';
+        msgOverlay.classList.add('game-over-style');
+        coverCard.classList.add('game-over-style');
+        msgTitle.classList.remove('game-over-text');
+        msgDesc.classList.remove('game-over-text');
+        coverIllustration.style.display = 'block';
+        
+        msgTitle.innerText = "👑 恭喜完美通關！";
+        msgTitle.style.color = "#eab308";
+        msgTitle.style.textShadow = "2px 2px 0px #000";
+        
+        msgDesc.innerHTML = `太厲害了！你成功帶領小麻雀通過了 10 關考驗，順利躲過所有大雨！<br><br>您的最終榮譽得分是 : <span style="color:#fef08a; font-size:28px; font-weight:bold;">${score}</span> 分`;
+        startBtn.innerText = "再挑戰一次";
+    }
+
+    function endGame() {
+        gameState = 'GAMEOVER';
+        clearInterval(spawnLoopId);
+        bgm.pause();
+        
+        msgOverlay.style.display = 'flex';
+        msgOverlay.classList.add('game-over-style');
+        coverCard.classList.add('game-over-style');
+        msgTitle.classList.add('game-over-text');
+        msgDesc.classList.add('game-over-text');
+        coverIllustration.style.display = 'none';
+        
+        msgTitle.innerText = "被雨擊中！遊戲結束";
+        msgDesc.innerHTML = `哎呀，小麻雀被雨滴淋濕了 QQ<br><br>您的最終得分是 : <span style="color:#fef08a; font-size:24px;">${score}</span> 分<br>達到關卡 : 第 ${currentLevel} / 10 關`;
+        startBtn.innerText = "再試一次";
+    }
+
+    function toggleMenu() {
+        isMenuOpen = !isMenuOpen;
+        if(isMenuOpen) {
+            hamburgerBtn.classList.add('open');
+            menuPanel.classList.add('open');
+        } else {
+            hamburgerBtn.classList.remove('open');
+            menuPanel.classList.remove('open');
+        }
+    }
+
+    function adjustVolume(val) {
+        bgm.volume = parseFloat(val);
+    }
+
+    function menuRestart() {
+        toggleMenu();
+        initGame();
+        startGame();
+    }
+
+    function exitGame() {
+        toggleMenu();
+        initGame();
+    }
+
+    // 操作控制：鍵盤
+    window.addEventListener('keydown', e => {
+        if (gameState !== 'PLAYING') return;
+        if (e.key === 'ArrowUp' && currentLane > 0) {
+            currentLane--;
+            renderSparrowPosition();
+        } else if (e.key === 'ArrowDown' && currentLane < 2) {
+            currentLane++;
+            renderSparrowPosition();
+        } else if (e.key === 'ArrowRight') {
+            speedMultiplier = 2.2;
+        }
+    });
+
+    window.addEventListener('keyup', e => {
+        if (e.key === 'ArrowRight') speedMultiplier = 1;
+    });
+
+    // 手機與滑鼠觸控點擊控制
+    function handleActionStart(e) {
+        if (gameState !== 'PLAYING') return;
+        const clientY = e.touches ? e.touches[0].clientY : e.clientY;
+        const clientX = e.touches ? e.touches[0].clientX : e.clientX;
+        const rect = container.getBoundingClientRect();
+        
+        let isPortrait = window.innerHeight > window.innerWidth;
+        
+        if (isPortrait) {
+            if (clientY < rect.top + rect.height * 0.35) {
+                speedMultiplier = 2.2;
+            } else {
+                const relativeX = clientX - rect.left;
+                if (relativeX < rect.width / 2 && currentLane > 0) {
+                    currentLane--;
+                } else if (relativeX >= rect.width / 2 && currentLane < 2) {
+                    currentLane++;
+                }
+                renderSparrowPosition();
+            }
+        } else {
+            if (clientX > rect.left + rect.width * 0.65) {
+                speedMultiplier = 2.2;
+            } else {
+                if (clientY < rect.top + rect.height / 2 && currentLane > 0) {
+                    currentLane--;
+                } else if (clientY >= rect.top + rect.height / 2 && currentLane < 2) {
+                    currentLane++;
+                }
+                renderSparrowPosition();
+            }
+        }
+    }
+
+    function handleActionEnd() {
+        speedMultiplier = 1;
+    }
+
+    container.addEventListener('mousedown', handleActionStart);
+    container.addEventListener('mouseup', handleActionEnd);
+    container.addEventListener('touchstart', handleActionStart);
+    container.addEventListener('touchend', handleActionEnd);
+</script>
+</body>
+</html>
